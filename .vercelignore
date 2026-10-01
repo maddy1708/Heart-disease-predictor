@@ -1,0 +1,22 @@
+# Ignore local virtual environments & python caches
+heart-disease-ml/
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore datasets, heavy evaluation figures, notebooks, and PDFs
+data/
+results/
+notebooks/
+scripts/
+CardioGuard_Research_Paper.pdf
+
+# Ignore OS & Git metadata
+.git/
+.github/
+.DS_Store
+.cache/
