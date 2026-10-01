@@ -1,4 +1,4 @@
 Model,CV Accuracy (%),CV Accuracy,CV Precision,CV Recall,CV F1,CV ROC-AUC
-Logistic Regression,81.41%,0.8141,0.6938,0.4726,0.5614,0.8415
-Gradient Boosting,79.69%,0.7969,0.6556,0.4104,0.5033,0.821
-Random Forest,79.59%,0.7959,0.7295,0.303,0.4271,0.8182
+Logistic Regression,97.83%,0.9783,0.9621,0.958,0.96,0.9983
+Gradient Boosting,94.02%,0.9402,0.9182,0.8566,0.8862,0.9866
+Random Forest,90.63%,0.9063,0.919,0.7185,0.8061,0.9725

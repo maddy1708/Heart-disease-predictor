@@ -55,47 +55,50 @@ MODELS_DIR = PROJECT_ROOT / "models"
 def get_models():
     """Build and return dictionary of tuned models and ensembles."""
     lr = LogisticRegression(
-        max_iter=2000,
-        C=1.0,
+        max_iter=5000,
+        C=5.0,
         random_state=42
     )
 
     rf = RandomForestClassifier(
-        n_estimators=250,
-        max_depth=12,
-        min_samples_split=4,
+        n_estimators=600,
+        max_depth=None,
+        min_samples_split=2,
+        max_features=0.5,
+        class_weight="balanced_subsample",
         random_state=42,
         n_jobs=1
     )
 
     gb = GradientBoostingClassifier(
-        n_estimators=200,
-        learning_rate=0.04,
-        max_depth=4,
-        subsample=0.85,
+        n_estimators=800,
+        learning_rate=0.05,
+        max_depth=3,
+        subsample=0.90,
         random_state=42
     )
 
     knn = KNeighborsClassifier(
-        n_neighbors=11,
+        n_neighbors=7,
         weights="distance",
+        metric="manhattan",
         n_jobs=1
     )
 
     svm = SVC(
-        C=1.0,
+        C=10.0,
         kernel="rbf",
+        gamma="scale",
         probability=True,
-        max_iter=1500,
         random_state=42
     )
 
     if HAS_XGBOOST:
         xgb_model = XGBClassifier(
-            n_estimators=200,
-            max_depth=5,
-            learning_rate=0.04,
-            subsample=0.85,
+            n_estimators=900,
+            max_depth=3,
+            learning_rate=0.05,
+            subsample=0.90,
             colsample_bytree=0.85,
             eval_metric="logloss",
             random_state=42,
@@ -103,9 +106,9 @@ def get_models():
         )
     else:
         xgb_model = HistGradientBoostingClassifier(
-            max_iter=200,
-            learning_rate=0.04,
-            max_depth=5,
+            max_iter=300,
+            learning_rate=0.06,
+            max_depth=6,
             random_state=42
         )
 
@@ -115,10 +118,11 @@ def get_models():
             ("lr", lr),
             ("gb", gb),
             ("rf", rf),
-            ("xgb", xgb_model)
+            ("xgb", xgb_model),
+            ("svm", svm)
         ],
         voting="soft",
-        weights=[1.2, 1.5, 1.0, 1.3]
+        weights=[3.0, 1.5, 0.5, 1.5, 1.5]
     )
 
     models = {

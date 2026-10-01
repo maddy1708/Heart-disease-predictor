@@ -1,7 +1,9 @@
 """
-Model Evaluation Module for Heart Attack Risk Prediction
-Evaluates all trained models on the test set, performs 5-fold Stratified Cross Validation,
-generates multi-model ROC-AUC comparison curves, and exports metrics and figures.
+Model Evaluation & Figure Generation Module for Heart Attack Risk Prediction
+Evaluates all models, runs 5-fold Stratified Cross-Validation, and generates:
+- Multi-Model ROC-AUC curves (roc_auc_curves.png)
+- Metric Comparison Bar Chart (model_comparison_bar.png)
+- Confusion Matrix Grid (confusion_matrices.png)
 """
 
 import os
@@ -24,6 +26,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Ensure project root and src directory are in Python path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -102,9 +105,9 @@ def plot_roc_curves(model_dict: dict, X_test, y_test, output_path: Path):
     plt.figure(figsize=(10, 8))
 
     colors = {
-        "voting_ensemble": "#d62728",
         "logistic_regression": "#1f77b4",
         "gradient_boosting": "#2ca02c",
+        "voting_ensemble": "#d62728",
         "xgboost": "#ff7f0e",
         "random_forest": "#9467bd",
         "knn": "#8c564b",
@@ -123,14 +126,13 @@ def plot_roc_curves(model_dict: dict, X_test, y_test, output_path: Path):
         score = roc_auc_score(y_test, probs)
         scored_models.append((name, model, probs, score))
 
-    # Sort descending by ROC-AUC
     scored_models.sort(key=lambda x: x[3], reverse=True)
 
     for name, model, probs, score in scored_models:
         fpr, tpr, _ = roc_curve(y_test, probs)
         display_name = name.replace("_", " ").title()
         color = colors.get(name, None)
-        lw = 2.8 if name in ["voting_ensemble", "logistic_regression", "gradient_boosting"] else 2.0
+        lw = 2.8 if name in ["logistic_regression", "gradient_boosting", "voting_ensemble"] else 2.0
 
         plt.plot(
             fpr, tpr,
@@ -139,8 +141,7 @@ def plot_roc_curves(model_dict: dict, X_test, y_test, output_path: Path):
             color=color
         )
 
-    # Baseline diagonal
-    plt.plot([0, 1], [0, 1], "k--", label="Random Chance (AUC = 0.5000)", linewidth=1.5, alpha=0.7)
+    plt.plot([0, 1], [0, 1], "k--", label="Random Baseline (AUC = 0.5000)", linewidth=1.5, alpha=0.7)
 
     plt.xlim([-0.02, 1.02])
     plt.ylim([-0.02, 1.05])
@@ -157,6 +158,78 @@ def plot_roc_curves(model_dict: dict, X_test, y_test, output_path: Path):
     print(f"\nSaved ROC-AUC Curve graph to {output_path}")
 
 
+def plot_model_comparison_bar(results_df: pd.DataFrame, output_path: Path):
+    """Generate and save model comparison bar chart across Accuracy and ROC-AUC."""
+    plt.figure(figsize=(12, 6))
+
+    df_plot = results_df.copy()
+    df_plot["Model_Display"] = df_plot["Model"].str.replace("_", " ").str.title()
+    df_plot["Accuracy_Num"] = df_plot["Accuracy"] * 100.0
+    df_plot["ROC_AUC_Num"] = df_plot["ROC-AUC"] * 100.0
+
+    x = np.arange(len(df_plot))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(12, 6.5))
+    rects1 = ax.bar(x - width/2, df_plot["Accuracy_Num"], width, label="Accuracy (%)", color="#1d3557", edgecolor="black")
+    rects2 = ax.bar(x + width/2, df_plot["ROC_AUC_Num"], width, label="ROC-AUC (×100)", color="#e63946", edgecolor="black")
+
+    ax.set_ylabel("Score (%)", fontsize=12, fontweight="bold")
+    ax.set_title("Machine Learning Models Performance Comparison (Test Set)", fontsize=14, fontweight="bold", pad=15)
+    ax.set_xticks(x)
+    ax.set_xticklabels(df_plot["Model_Display"], fontsize=11, rotation=15)
+    ax.legend(fontsize=11, frameon=True)
+    ax.set_ylim(60, 105)
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    # Attach labels
+    for rect in rects1:
+        h = rect.get_height()
+        ax.annotate(f"{h:.1f}%", xy=(rect.get_x() + rect.get_width() / 2, h),
+                    xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=9.5, fontweight="bold")
+
+    for rect in rects2:
+        h = rect.get_height()
+        ax.annotate(f"{h:.1f}", xy=(rect.get_x() + rect.get_width() / 2, h),
+                    xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", fontsize=9.5, fontweight="bold")
+
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved model comparison bar chart to {output_path}")
+
+
+def plot_confusion_matrices(model_dict: dict, X_test, y_test, output_path: Path):
+    """Generate 2x2 grid of confusion matrices for top classifiers."""
+    top_models = ["logistic_regression", "gradient_boosting", "voting_ensemble", "random_forest"]
+    available_top = [m for m in top_models if m in model_dict]
+
+    fig, axes = plt.subplots(2, 2, figsize=(11, 9))
+    axes = axes.flatten()
+
+    for idx, name in enumerate(available_top):
+        model = model_dict[name]
+        preds = model.predict(X_test)
+        cm = confusion_matrix(y_test, preds)
+        display_name = name.replace("_", " ").title()
+
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False, ax=axes[idx],
+                    xticklabels=["No Risk (0)", "High Risk (1)"],
+                    yticklabels=["No Risk (0)", "High Risk (1)"],
+                    annot_kws={"size": 13, "weight": "bold"})
+        axes[idx].set_title(f"{display_name}\nAccuracy: {accuracy_score(y_test, preds)*100:.2f}%", fontsize=12, fontweight="bold")
+        axes[idx].set_xlabel("Predicted Label", fontsize=10, fontweight="bold")
+        axes[idx].set_ylabel("True Clinical Label", fontsize=10, fontweight="bold")
+
+    plt.suptitle("Confusion Matrices for Top Performing Classifiers", fontsize=14, fontweight="bold", y=0.98)
+    plt.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved confusion matrices grid to {output_path}")
+
+
 def cross_validation(X_train, y_train) -> pd.DataFrame:
     """Perform 5-fold stratified cross validation."""
     print("\n" + "=" * 60)
@@ -164,9 +237,9 @@ def cross_validation(X_train, y_train) -> pd.DataFrame:
     print("=" * 60)
 
     cv_models = {
-        "Logistic Regression": LogisticRegression(max_iter=2000, random_state=42),
-        "Gradient Boosting": GradientBoostingClassifier(n_estimators=200, learning_rate=0.04, max_depth=4, random_state=42),
-        "Random Forest": RandomForestClassifier(n_estimators=250, max_depth=12, random_state=42, n_jobs=1)
+        "Logistic Regression": LogisticRegression(max_iter=2000, C=2.0, random_state=42),
+        "Gradient Boosting": GradientBoostingClassifier(n_estimators=300, learning_rate=0.06, max_depth=4, random_state=42),
+        "Random Forest": RandomForestClassifier(n_estimators=300, max_depth=16, random_state=42, n_jobs=1)
     }
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -264,9 +337,15 @@ def main():
     print(results_df[["Model", "Accuracy (%)", "Precision", "Recall", "F1", "ROC-AUC"]].to_string(index=False))
     print(f"\nSaved test comparison to {comparison_path}")
 
-    # Generate ROC Curves Graph
+    # Generate Figures
     roc_curve_path = FIGURES_DIR / "roc_auc_curves.png"
     plot_roc_curves(loaded_models, X_test, y_test, roc_curve_path)
+
+    bar_chart_path = FIGURES_DIR / "model_comparison_bar.png"
+    plot_model_comparison_bar(results_df, bar_chart_path)
+
+    cm_path = FIGURES_DIR / "confusion_matrices.png"
+    plot_confusion_matrices(loaded_models, X_test, y_test, cm_path)
 
     # Run Cross-Validation
     cv_df = cross_validation(X_train, y_train)
@@ -275,7 +354,7 @@ def main():
     print(f"\nSaved cross-validation results to {cv_path}")
 
     print("\n" + "=" * 60)
-    print("SUCCESS: Evaluation and ROC graph generation completed.")
+    print("SUCCESS: Evaluation and high-resolution figure generation completed.")
     print("=" * 60)
 
 
